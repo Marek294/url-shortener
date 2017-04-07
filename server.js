@@ -3,46 +3,37 @@ var router = express();
 var port = process.env.PORT || 3000;
 
 var mongo = require('mongodb').MongoClient;
+var db = undefined;
+
+mongo.connect('mongodb://localhost:27017/local', (err, database) => {
+    if(err) throw err;
+    db = database;
+});
 
 router.get("/:id", (req,res) => {
-   
-   mongo.connect('mongodb://localhost:27017/local', (err, db) => {
-        if(err) throw err;
-        
-        var collection = db.collection('urls');
-        
-        collection.find({_id: parseInt(req.params.id)}).toArray((err,data) => {
-            if(err) throw err;
+    var collection = db.collection('urls');
+    
+    collection.find({_id: parseInt(req.params.id)}).toArray((err,data) => {
+        if (err) throw err;
+        if (data.length == 0) { console.log("Invalid Id: " + req.params.id); return; };
 
-            res.redirect(data[0].originalUrl);
-            
-            db.close();
-        });
-        
-        
+        res.redirect(data[0].originalUrl);
     });
 });
 
-router.get("/new/*", (req,res) => {
-    
-    mongo.connect('mongodb://localhost:27017/local', (err, db) => {
-        if(err) throw err;
-        
-        var link = req.originalUrl;
-        link = link.slice(5,link.length);
-        
-        var collection = db.collection('urls');
-        var counter = db.collection('counter');
-        
-        collection.find({originalUrl: link}).toArray((err,data) => {
-            if(err) throw err;
+router.get("/new/:addr(*)", (req,res) => {
 
-            data.length === 0 ? insertNewUrl(db, counter, collection, link, req, res) : showGeneratedUrl(db, data[0], req, res);
-        });
-            
-          
-    });
+    var link = req.params.addr;
     
+    var collection = db.collection('urls');
+    var counter = db.collection('counter');
+    
+    collection.find({originalUrl: link}).toArray((err, data) => {
+        if (data.length === 0)
+            showGeneratedUrl(db, data[0], req, res);
+        else
+            insertNewUrl(db, counter, collection, link, req, res);
+    });
 });
 
 router.listen(port, () => {
@@ -65,8 +56,6 @@ function insertNewUrl(db, counter, collection, link, req, res){
         resObject["shortUrl"] = req.hostname+"/"+data[0].seq;
             
         res.send(resObject);
-            
-        db.close();
     })
 
 }
@@ -80,6 +69,4 @@ function showGeneratedUrl(db, data, req, res) {
     resObject["shortUrl"] = req.hostname+"/"+data["_id"];
             
     res.send(resObject);
-    
-    db.close();
 }
